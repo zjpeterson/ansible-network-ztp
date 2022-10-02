@@ -1,0 +1,13 @@
+{# Get the first interface marked as Management Only #}
+{%- set interface_data = interfaces | community.general.json_query('[?mgmt_only==`true`]') | first -%}
+{# Get the first (should be only) IP address associated with the above interface #}
+{%- set ip_address_data = interface_data.ip_addresses | first -%}
+{# Set up the JSON data #}
+{%- set json_data = {
+  'mgmt_interface': interface_data.name,
+  'mgmt_address': ip_address_data.address | ansible.utils.ipaddr('address'),
+  'mgmt_netmask': ip_address_data.address | ansible.utils.ipaddr('netmask'),
+  'mgmt_gateway': ip_address_data.address | ansible.utils.ipaddr('-2') | ansible.utils.ipaddr('address')
+} -%}
+{# Dump contents #}
+{{ json_data | to_nice_json }}

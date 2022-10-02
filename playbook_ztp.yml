@@ -1,0 +1,32 @@
+---
+- name: Prepare web server
+  hosts: platforms_ios
+  gather_facts: no
+
+  vars:
+    public_key: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDNZcrJnihIQ8LGC2IFIgmunCPamX7VcEWSH94rzd/r6Otnd6u8Psuc1dqWcl0QWnm89hlVQUDMifockXYRs6e6kc8bc+kK353wYJSBNu8UVHhL0Zgnw0fmlZHpAiu51P+H1voOycMxR3VZBZJ6gt7KWNGPO1GupOPvLrP7+mjVaKqSApFxHl3IKTzh4xDqSs9zqGiEUr3RIsC8MGdcfGTPr2naNsmOhDfaMMzapc7TOwV63sG+vNGoK+mEf3n1948tFWcpcZw7O+mHNAD0JmqMlwBz1F+SPhaj817t2Kc5obCdTAV8A7OlXkCfcf7kJfCaDRpwJzW7gaKTjFMMRqkgHUg0E62JSxWVh1stX1P09wELNrcmkg/zMpkieF6CGKbwMz7gK9dAj/xB+0gpGuDK09waPuHz8ZrqgC+bS+iuUUc7n+kQiqgXxrFMpGavH68jCbjL8Oe3NRhh2sn0d7TRgv4IpOuWnhS37FrKsA09XemiX/xzE3FzxnjfEpnCjMyJRKD5S7Q8NU2j6bcAaHsZfDZl41c9r1aqNHrCRH5Ms3yZ/9g5fYgyfseHMXxoK6wukuF2MPu8SAQLZClCIwxmjqGzMXu5BQp4yZjuDX/6I0/JhLhYb3ngdV0x8j4t/yDYPR7CXzIT+SEM+XmLGjLDs6g8Nt1L4n4mjVZ0jRvH8w==
+    controller_address: x.x.x.x
+    controller_token: test123
+    controller_template: 23
+    web_dir: /var/www/html
+
+  tasks:
+    - name: Make Python script
+      ansible.builtin.template:
+        src: ztp.py.j2
+        dest: "{{ web_dir }}/ztp.py"
+      run_once: yes
+      delegate_to: web
+
+    - name: Make controller JSON file
+      ansible.builtin.template:
+        src: controller.json.j2
+        dest: "{{ web_dir }}/controller.json"
+      run_once: yes
+      delegate_to: web
+
+    - name: Make device JSON files
+      ansible.builtin.template:
+        src: device_serial.json.j2
+        dest: "{{ web_dir }}/device_{{ serial }}.json"
+      delegate_to: web

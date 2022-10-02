@@ -1,0 +1,11 @@
+---
+plugin: netbox.netbox.nb_inventory
+validate_certs: false
+interfaces: true
+compose:
+  serial: serial
+  ansible_network_os: platform.slug
+group_by: platforms
+query_filters:
+  - status: planned
+  - platform: ios

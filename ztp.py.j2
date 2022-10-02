@@ -1,0 +1,62 @@
+import cli
+import urllib2
+import re
+import ssl
+import json
+from xml.dom import minidom
+
+WEB_SERVER = "{{ hostvars['web']['ansible_host'] }}"
+
+def get_serials():
+    inventory = cli.cli('show inventory | format').strip()
+    document = minidom.parseString(inventory)
+    serials = list()
+    for entry in document.getElementsByTagName('InventoryEntry'):
+        chassis = entry.getElementsByTagName('ChassisName')[0]
+        name = chassis.firstChild.data
+        if name == "Chassis" or re.match('"Switch ([0-9])"', name):
+            serials.append(entry.getElementsByTagName('SN')[0].firstChild.data)
+    print('ANSIBLE ZTP: Discovered serials {}'.format(','.join(serials)))
+    return serials
+
+def get_remote_data(file_name):
+    get_url = 'http://{}/{}'.format(WEB_SERVER, file_name)
+    response = urllib2.urlopen(get_url)
+    r_data = json.load(response)
+    return r_data
+
+def configure_management(device_data, public_key):
+    print('ANSIBLE ZTP: Configuring management')
+    cli.configure(['interface {}'.format(device_data['mgmt_interface']), 'ip address {} {}'.format(device_data['mgmt_address'], device_data['mgmt_netmask'])])
+    cli.configure('ip route vrf Mgmt-vrf 0.0.0.0 0.0.0.0 {}'.format(device_data['mgmt_gateway']))
+    cli.configure('username ansible privilege 15')
+    cli.configure(['ip ssh pubkey-chain', 'username ansible', 'key-string'] + public_key + ['exit'])
+    cli.configure(['line vty 0 4', 'login local'])
+
+def call_controller(controller_data, serial):
+    headers = {"Content-Type": "application/json"}
+    data = {"host_config_key": controller_data['controller_token']}
+    launch_url = 'https://{}/api/v2/job_templates/{}/callback/'.format(controller_data['controller_address'], controller_data['controller_template'])
+    print('ANSIBLE ZTP: Contacting Ansible Controller API at {}'.format(launch_url))
+    request = urllib2.Request(launch_url, data=json.dumps(data), headers=headers)
+    response = urllib2.urlopen(request, context=ssl._create_unverified_context())
+    api_node = response.info()['X-API-Node']
+    api_location = response.info()['location']
+    print('ANSIBLE ZTP: Initiated job at {}{}'.format(api_node, api_location))
+
+def main():
+    print('\nANSIBLE ZTP: Starting')
+    controller_data = get_remote_data('controller.json')
+    serials = get_serials()
+    for serial in serials:
+        if serial in controller_data['valid_serials']:
+            print('ANSIBLE ZTP: Serial {} was found within known data; proceeding'.format(serial))
+            device_data = get_remote_data('device_{}.json'.format(serial))
+            configure_management(device_data, controller_data['public_key'])
+            call_controller(controller_data, serial)
+            break
+        else:
+            print('ANSIBLE ZTP: Serial {} was not found within known data; skipping'.format(serial))
+
+if __name__ == "__main__":
+    main()

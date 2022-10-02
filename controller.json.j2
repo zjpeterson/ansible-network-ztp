@@ -1,0 +1,12 @@
+{# Isolate and split the public key data into 100-char lines #}
+{%- set public_key_data = (public_key | split(' '))[1] | batch(100) | map('join') -%}
+{# Set up the JSON data #}
+{%- set json_data = {
+  'public_key': public_key_data,
+  'controller_address': controller_address,
+  'controller_token': controller_token,
+  'controller_template': controller_template,
+  'valid_serials': hostvars | dict2items | community.general.json_query('[].value.serial')
+} -%}
+{# Dump contents #}
+{{ json_data | to_nice_json }}
